@@ -24,15 +24,26 @@
 #       and posting one notification at the end. Exit 0 when everything was
 #       sent, 1 when any file failed, 2 on bad arguments.
 #
+#   send.sh pick [--target <dns-or-host>]
+#       Run the system file chooser, then summon the overlay again with the
+#       chosen files (and the target, so the same tile stays under the
+#       cursor). The overlay closes itself before calling this: it holds
+#       exclusive keyboard focus on the overlay layer, which would leave the
+#       chooser dialog underneath and unfocusable. Cancelling the chooser
+#       summons the overlay back in clipboard mode.
+#
 # Staging lives under $XDG_RUNTIME_DIR so it is per-user, tmpfs, and gone at
 # logout. The file is named clipboard.<ext> so the receiver sees that name.
 
 set -o pipefail
 
 STAGE_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-taildrop"
+PLUGIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PLUGIN_ID=$(jq -r '.id // empty' "$PLUGIN_DIR/manifest.json" 2>/dev/null)
+: "${PLUGIN_ID:=io.github.ryenski.taildrop}"
 
 usage() {
-  sed -n '2,27p' "$0" >&2
+  sed -n '2,35p' "$0" >&2
   exit 2
 }
 
@@ -235,6 +246,41 @@ send_files() {
   return 1
 }
 
+summon() {
+  omarchy-shell shell summon "$PLUGIN_ID" "$1" >/dev/null
+}
+
+pick_files() {
+  local target="" picked status=0
+  local -a files=()
+
+  while (( $# )); do
+    case "$1" in
+      --target) target="${2:-}"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+
+  picked=$(omarchy-file-select --title "Send with Taildrop" --multiple) || status=$?
+
+  case $status in
+    0)
+      # One path per line; jq builds the array so odd characters survive.
+      readarray -t files <<<"$picked"
+      summon "$(jq -cn --arg target "$target" \
+        '{files: $ARGS.positional, source: "chooser", target: $target}' --args "${files[@]}")"
+      ;;
+    1)
+      summon "$(jq -cn --arg target "$target" '{target: $target}')"
+      ;;
+    *)
+      notify -u critical "Could not open the file chooser" "Taildrop needs the desktop file portal"
+      summon "$(jq -cn --arg target "$target" '{target: $target}')"
+      return 1
+      ;;
+  esac
+}
+
 case "${1:-}" in
   stage-clipboard)
     shift
@@ -243,6 +289,10 @@ case "${1:-}" in
   send)
     shift
     send_files "$@"
+    ;;
+  pick)
+    shift
+    pick_files "$@"
     ;;
   *)
     usage

@@ -321,6 +321,16 @@ Item {
     sendProcess.running = true
   }
 
+  // The portal chooser is a normal window; it would open underneath this
+  // exclusive-focus overlay. So step aside and let send.sh bring us back
+  // with the chosen files (see `pick` in send.sh).
+  function pickFiles() {
+    if (root.phase !== "choose") return
+    var target = root.cursorActive && root.cursorIndex < tileModel.count ? tileModel.get(root.cursorIndex).target : ""
+    root.dismiss()
+    Quickshell.execDetached([root.sendSh, "pick", "--target", target])
+  }
+
   function retryFailed() {
     var files = []
     for (var i = 0; i < transferModel.count; i++) {
@@ -535,6 +545,8 @@ Item {
             root.refresh()
           } else if (text === "c") {
             root.stageClipboard(true)
+          } else if (text === "f") {
+            root.pickFiles()
           } else {
             return
           }
@@ -938,7 +950,7 @@ Item {
                 if (root.phase === "sending") return [["esc", "close (keeps sending)"]]
                 if (root.phase === "failed") return [["r", "retry"], ["esc", "close"]]
                 if (root.phase === "done") return [["esc", "close"]]
-                return [["↵", "send"], ["c", "clipboard"], ["r", "refresh"], ["esc", "close"]]
+                return [["↵", "send"], ["c", "clipboard"], ["f", "files"], ["r", "refresh"], ["esc", "close"]]
               }
 
               Row {
