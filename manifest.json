@@ -2,11 +2,13 @@
   "schemaVersion": 1,
   "id": "ryenski.taildrop",
   "name": "Taildrop",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Ryan Heneise",
   "license": "MIT",
   "description": "Share-sheet overlay for Tailscale Taildrop: send the clipboard, highlighted text, or files to any device on your tailnet.",
-  "kinds": ["overlay"],
+  "kinds": [
+    "overlay"
+  ],
   "keepLoaded": true,
   "entryPoints": {
     "overlay": "Taildrop.qml"

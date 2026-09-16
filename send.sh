@@ -43,11 +43,16 @@
 #       First-run setup, run by the overlay each time the shell loads it.
 #       Keeps the Nautilus "Send with Taildrop" item in sync with the copy
 #       in this folder (restarting Nautilus when it changed, since it only
-#       loads extensions at startup), and -- once ever -- appends the SUPER+SHIFT+T keybind
-#       to ~/.config/hypr/bindings.lua when nothing binds the overlay yet and
-#       the key is free. Idempotent and quiet unless it changes something.
-#       --remove takes the Nautilus item out again (the keybind is yours to
-#       delete; it is never touched after the first run).
+#       loads extensions at startup). If nothing binds the overlay yet, it
+#       offers -- once -- a notification whose click runs `add-keybind`; the
+#       user's keybindings are never written without that click. Idempotent
+#       and quiet unless it changes something. --remove takes the Nautilus
+#       item out again.
+#
+#   send.sh add-keybind
+#       Append the SUPER+SHIFT+T bind and the overlay's layer rule to
+#       ~/.config/hypr/bindings.lua, unless the overlay is already bound or
+#       the key is taken. This is what the setup notification runs on click.
 #
 # Staging lives under $XDG_RUNTIME_DIR so it is per-user, tmpfs, and gone at
 # logout. The file is named clipboard.<ext> so the receiver sees that name.
@@ -60,7 +65,7 @@ PLUGIN_ID=$(jq -r '.id // empty' "$PLUGIN_DIR/manifest.json" 2>/dev/null)
 : "${PLUGIN_ID:=ryenski.taildrop}"
 
 usage() {
-  sed -n '2,51p' "$0" >&2
+  sed -n '2,56p' "$0" >&2
   exit 2
 }
 
@@ -370,18 +375,37 @@ bind_key_taken() {
   hyprctl binds -j 2>/dev/null | jq -e '.[] | select(.modmask == 65 and (.key | ascii_downcase) == "t")' >/dev/null 2>&1
 }
 
-setup_keybind() {
+# Offers the keybind once, as a notification whose click appends it. The
+# marker records that the offer was made, whatever the user did with it.
+offer_keybind() {
   local marker="$STATE_DIR/keybind-offered"
   [[ -f $marker ]] && return 1
   [[ -f $BINDINGS ]] || return 1
   mkdir -p "$STATE_DIR"
-  if grep -qF "$BIND_COMMAND" "$BINDINGS"; then
-    touch "$marker"
+  touch "$marker"
+  grep -qF "$BIND_COMMAND" "$BINDINGS" && return 1
+  if bind_key_taken; then
+    notify -u normal -t 30000 "Taildrop has no shortcut yet" \
+      "$BIND_KEY is already in use. Bind a key to: $BIND_COMMAND"
+  else
+    notify -u normal -t 30000 "Taildrop has no shortcut yet" \
+      "Click to add $BIND_KEY to ~/.config/hypr/bindings.lua" \
+      --exec "$PLUGIN_DIR/send.sh" add-keybind
+  fi
+  return 0
+}
+
+add_keybind() {
+  if [[ ! -f $BINDINGS ]]; then
+    notify -u critical "Could not add the Taildrop shortcut" "$BINDINGS does not exist"
     return 1
   fi
+  if grep -qF "$BIND_COMMAND" "$BINDINGS"; then
+    notify "Taildrop shortcut already set" "See $BINDINGS"
+    return 0
+  fi
   if bind_key_taken; then
-    touch "$marker"
-    notify "Taildrop has no shortcut yet" "$BIND_KEY is already in use. Add a bind for: $BIND_COMMAND"
+    notify -u critical "$BIND_KEY is already in use" "Bind a key to: $BIND_COMMAND"
     return 1
   fi
   cat >>"$BINDINGS" <<LUA
@@ -390,7 +414,7 @@ setup_keybind() {
 o.bind("$BIND_KEY", "Send via Taildrop", "$BIND_COMMAND")
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 LUA
-  touch "$marker"
+  notify "Taildrop shortcut added" "$BIND_KEY opens the share sheet"
 }
 
 setup() {
@@ -410,7 +434,7 @@ setup() {
       changed+=("Nautilus menu item installed")
     fi
   fi
-  setup_keybind && changed+=("$BIND_KEY added to ~/.config/hypr/bindings.lua")
+  offer_keybind && echo "keybind offered"
   (( ${#changed[@]} )) || return 0
   printf '%s\n' "${changed[@]}"
   notify "Taildrop is set up" "$(printf '%s. ' "${changed[@]}")"
@@ -436,6 +460,9 @@ case "${1:-}" in
   setup)
     shift
     setup "$@"
+    ;;
+  add-keybind)
+    add_keybind
     ;;
   *)
     usage

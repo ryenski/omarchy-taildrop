@@ -56,30 +56,34 @@ Send-only. Receiving is already handled by Omarchy's
 omarchy plugin add https://github.com/ryenski/omarchy-taildrop.git --enable
 ```
 
-That's it. `omarchy plugin add` never runs plugin code, but the first time
-the shell loads the overlay it sets up the two things that live outside the
-plugin folder, and tells you so with a notification:
+`omarchy plugin add` never runs plugin code. The first time the shell loads
+the overlay, it takes care of the two things that live outside the plugin
+folder:
 
-- the Nautilus **Send with Taildrop** menu item, copied into
+- The Nautilus **Send with Taildrop** menu item is copied into
   `~/.local/share/nautilus-python/extensions/` and kept in sync on updates.
   Nautilus only loads extensions at startup, so if it is running when the
-  item is installed or changes, it gets restarted (`nautilus -q`);
-- the keybind, appended **once** to `~/.config/hypr/bindings.lua` — only if
-  nothing binds the overlay yet and `SUPER + SHIFT + T` is free. If the key
-  is taken you get a notification instead, and you add a line by hand:
+  item is installed or changes, it gets restarted (`nautilus -q`).
+- If nothing binds the overlay yet, you get **one** notification: *Taildrop
+  has no shortcut yet — click to add SUPER + SHIFT + T*. Clicking it appends
+  these two lines to `~/.config/hypr/bindings.lua`; ignoring it means your
+  keybindings are never touched. If the key is already in use, the
+  notification says so instead and you bind a key of your own:
 
 ```lua
 o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle ryenski.taildrop")
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 ```
 
-The keybind is never touched again after that first run, so changing or
-deleting it later sticks. `install.sh` runs the same setup by hand.
+`install.sh` runs the same setup by hand, and
+`~/.config/omarchy/plugins/ryenski.taildrop/send.sh add-keybind` adds the
+shortcut if you dismissed the notification.
 
-Requirements: `tailscale` on `PATH` with the operator set to your user
-(`sudo tailscale set --operator=$USER`), Taildrop enabled for the tailnet,
-`wl-clipboard`, `jq`, and `nautilus-python` for the context-menu item.
-Progress percentages need util-linux `script` (present on Omarchy).
+Requirements: `tailscale` on `PATH` with your user set as the Tailscale
+operator (`tailscale set --operator=$USER`, run once as root), Taildrop
+enabled for the tailnet, `wl-clipboard`, `jq`, and `nautilus-python` for the
+context-menu item. Progress percentages need util-linux `script` (present on
+Omarchy). Nothing in the plugin escalates privileges.
 
 ## Remove
 
@@ -103,7 +107,8 @@ send.sh stage-clipboard [--no-primary]   → JSON describing what was staged
 send.sh stage-image [--back N]           → an image from the clipboard history, newest first
 send.sh send --target <dns> <file>...    → tab-separated progress lines, a notification
 send.sh pick [--target <dns>]            → file chooser, then re-summons the overlay
-send.sh setup [--remove]                 → first-run setup: Nautilus item, keybind
+send.sh setup [--remove]                 → first-run setup: Nautilus item, keybind offer
+send.sh add-keybind                      → append the shortcut to bindings.lua (the offer's click)
 ```
 
 Devices come from `tailscale status --json`, using Tailscale's own
