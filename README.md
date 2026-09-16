@@ -75,9 +75,13 @@ o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle rye
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 ```
 
-`install.sh` runs the same setup by hand, and
-`~/.config/omarchy/plugins/ryenski.taildrop/send.sh add-keybind` adds the
-shortcut if you dismissed the notification.
+To run that setup by hand, or add the shortcut after dismissing the
+notification:
+
+```bash
+~/.config/omarchy/plugins/ryenski.taildrop/send.sh setup
+~/.config/omarchy/plugins/ryenski.taildrop/send.sh add-keybind
+```
 
 Requirements: `tailscale` on `PATH` with your user set as the Tailscale
 operator (`tailscale set --operator=$USER`, run once as root), Taildrop
@@ -88,14 +92,14 @@ Omarchy). Nothing in the plugin escalates privileges.
 ## Remove
 
 ```bash
-~/.config/omarchy/plugins/ryenski.taildrop/install.sh --remove
+~/.config/omarchy/plugins/ryenski.taildrop/send.sh setup --remove
 omarchy plugin remove ryenski.taildrop
 ```
 
 and delete the two lines from `bindings.lua`. If you only run
 `omarchy plugin remove`, the Nautilus item notices the plugin is gone and
-stops showing up; `install.sh --remove` just deletes the leftover file
-(run it first, while the plugin folder still exists).
+stops showing up; `setup --remove` just deletes the leftover file (run it
+first, while the plugin folder still exists).
 
 ## How it works
 
@@ -117,9 +121,10 @@ else (another owner, no Taildrop support) is ignored.
 
 ## Develop
 
+With a checkout of this repository somewhere outside
+`~/.config/omarchy/plugins`:
+
 ```bash
-git clone https://github.com/ryenski/omarchy-taildrop.git ~/Work/omarchy-taildrop
-cd ~/Work/omarchy-taildrop
 ./dev.sh link        # symlink into ~/.config/omarchy/plugins and rescan
 omarchy plugin enable ryenski.taildrop
 ./dev.sh summon      # or with a payload: ./dev.sh summon '{"files":["/etc/hostname"]}'
