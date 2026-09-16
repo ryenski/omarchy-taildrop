@@ -15,7 +15,7 @@ require_version("Nautilus", "4.1")
 
 from gi.repository import GObject, Gio, Nautilus
 
-PLUGIN_ID = "io.github.ryenski.taildrop"
+PLUGIN_ID = "ryenski.taildrop"
 PLUGIN_MANIFEST = os.path.join(
     os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
     "omarchy", "plugins", PLUGIN_ID, "manifest.json",

@@ -49,7 +49,7 @@ set -o pipefail
 STAGE_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-taildrop"
 PLUGIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PLUGIN_ID=$(jq -r '.id // empty' "$PLUGIN_DIR/manifest.json" 2>/dev/null)
-: "${PLUGIN_ID:=io.github.ryenski.taildrop}"
+: "${PLUGIN_ID:=ryenski.taildrop}"
 
 usage() {
   sed -n '2,44p' "$0" >&2

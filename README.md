@@ -50,7 +50,7 @@ plugin folder, and tells you so with a notification:
   is taken you get a notification instead, and you add a line by hand:
 
 ```lua
-o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle io.github.ryenski.taildrop")
+o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle ryenski.taildrop")
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 ```
 
@@ -65,8 +65,8 @@ Progress percentages need util-linux `script` (present on Omarchy).
 ## Remove
 
 ```bash
-~/.config/omarchy/plugins/io.github.ryenski.taildrop/install.sh --remove
-omarchy plugin remove io.github.ryenski.taildrop
+~/.config/omarchy/plugins/ryenski.taildrop/install.sh --remove
+omarchy plugin remove ryenski.taildrop
 ```
 
 and delete the two lines from `bindings.lua`. If you only run
@@ -96,7 +96,7 @@ Devices come from `tailscale status --json`, using Tailscale's own
 git clone https://github.com/ryenski/omarchy-taildrop.git ~/Work/omarchy-taildrop
 cd ~/Work/omarchy-taildrop
 ./dev.sh link        # symlink into ~/.config/omarchy/plugins and rescan
-omarchy plugin enable io.github.ryenski.taildrop
+omarchy plugin enable ryenski.taildrop
 ./dev.sh summon      # or with a payload: ./dev.sh summon '{"files":["/etc/hostname"]}'
 ./dev.sh reload      # after editing QML: restarts the shell (~1s)
 ./dev.sh validate && ./dev.sh lint

@@ -18,7 +18,7 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.ryenski.taildrop"
+  readonly property string pluginId: (root.manifest && root.manifest.id) || "ryenski.taildrop"
 
   property bool opened: false
   property var payload: ({})

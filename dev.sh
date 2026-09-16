@@ -1,5 +1,5 @@
 #!/bin/bash
-# Development helpers for the io.github.ryenski.taildrop Omarchy plugin.
+# Development helpers for the ryenski.taildrop Omarchy plugin.
 #
 #   dev.sh link       symlink this repo into ~/.config/omarchy/plugins and rescan
 #   dev.sh unlink     remove the symlink and rescan

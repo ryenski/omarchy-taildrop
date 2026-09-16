@@ -8,7 +8,7 @@ Omarchy already ships Taildrop plumbing: `omarchy-tailscale-send` (file chooser 
 
 Why not just use LocalSend? Because LocalSend and Tailscale don't get along: with Tailscale enabled, devices don't show up in LocalSend's discovery list and you have to type the device's IP by hand. Taildrop already knows every device on the tailnet, works across networks (not just the LAN), and needs no pairing — so a Taildrop share sheet is a straight substitute for LocalSend on Omarchy. Omarchy even ships a LocalSend Nautilus menu item (`/usr/share/omarchy/default/nautilus-python/extensions/localsend.py`) which this plugin mirrors for Taildrop.
 
-Outcome: a third-party Omarchy plugin `io.github.ryenski.taildrop` (kind `overlay`), developed in `~/Work/omarchy-taildrop`, installable with `omarchy plugin add`, plus a Nautilus context-menu item and a keybind. **Send-only** — receiving stays with the existing service.
+Outcome: a third-party Omarchy plugin `ryenski.taildrop` (kind `overlay`), developed in `~/Work/omarchy-taildrop`, installable with `omarchy plugin add`, plus a Nautilus context-menu item and a keybind. **Send-only** — receiving stays with the existing service.
 
 Verified on this machine (Tailscale 1.102.3, operator = ryenski, no sudo needed):
 - `tailscale file cp ~/Work/skills/README.md iphone:` delivered to the iPhone. ✅
@@ -20,7 +20,7 @@ Verified on this machine (Tailscale 1.102.3, operator = ryenski, no sudo needed)
 
 | Decision | Choice |
 |---|---|
-| Plugin id | `io.github.ryenski.taildrop` (repo `github.com/ryenski/omarchy-taildrop`) |
+| Plugin id | `ryenski.taildrop` (repo `github.com/ryenski/omarchy-taildrop`) |
 | v1 scope | keybind-summoned overlay, clipboard send (text + image, prefer image), file chooser, Nautilus "Send with Taildrop", keybind |
 | Deferred | drag-and-drop zone (no DnD onto layer-shell surfaces anywhere in the shell; unverified), multi-target send, inbox/receive UI |
 | Keybind payload | **Highlighted text first, then clipboard.** On `SUPER+SHIFT+T` (payload `{}`), stage the primary selection (`wl-paste --primary`) as `clipboard.txt` if it holds non-empty text; otherwise the clipboard — `image/png` wins over text. The footer says which ("Selection · …" vs "Clipboard · …"); `c` forces the clipboard in case a stale highlight wins. Skip either source when `x-kde-passwordManagerHint` is present (as `plugins/clipboard/capture.sh` does). |
@@ -31,7 +31,7 @@ Verified on this machine (Tailscale 1.102.3, operator = ryenski, no sudo needed)
 ## Repo layout — `~/Work/omarchy-taildrop`
 
 ```
-manifest.json          id io.github.ryenski.taildrop, kinds ["overlay"], keepLoaded true,
+manifest.json          id ryenski.taildrop, kinds ["overlay"], keepLoaded true,
                        entryPoints {"overlay": "Taildrop.qml"}, license MIT, version 0.1.0
 Taildrop.qml           the overlay: Item root + PanelWindow, all UI state
 Model.js               vendored subset of Omarchy's MIT Model.js (attribution header):
@@ -50,10 +50,10 @@ Constraints: no symlinks anywhere inside the repo (`omarchy-plugin-validate:115`
 ## Dev loop
 
 1. `git init ~/Work/omarchy-taildrop`.
-2. `dev.sh link`: `ln -s ~/Work/omarchy-taildrop ~/.config/omarchy/plugins/io.github.ryenski.taildrop`. The registry scans `for sub in "$dir"/*/` (`/usr/share/omarchy/shell/services/PluginRegistry.qml:712`) which follows a symlinked dir; the entry-point containment check is string-based (`:124-132`); `omarchy plugin remove` explicitly supports unlinking.
+2. `dev.sh link`: `ln -s ~/Work/omarchy-taildrop ~/.config/omarchy/plugins/ryenski.taildrop`. The registry scans `for sub in "$dir"/*/` (`/usr/share/omarchy/shell/services/PluginRegistry.qml:712`) which follows a symlinked dir; the entry-point containment check is string-based (`:124-132`); `omarchy plugin remove` explicitly supports unlinking.
 3. **Code edits need a shell restart.** Verified in step 1: `rescanPlugins` (and the registry's own inotify reload) re-mounts plugins but re-instantiates the QML engine's *cached* compiled component — `Qt.clearComponentCache` isn't reachable from QML, so edits never show up, symlink or real dir. `dev.sh reload` = `omarchy-restart-shell` (~1.1 s, lock-aware); `dev.sh rescan` = `rescanPlugins` for manifest-only changes; `dev.sh watch` restarts on save. A restart kills an in-flight send during dev — fine.
 4. `dev.sh validate` = `omarchy plugin validate ~/Work/omarchy-taildrop` (**real** path; the symlink itself trips `find -type l`). `dev.sh lint` = `/usr/lib/qt6/bin/qmllint -I /usr/share/omarchy/shell *.qml` (not on PATH).
-5. `omarchy plugin enable io.github.ryenski.taildrop` (adds to `plugins[]` in `~/.config/omarchy/shell.json`), then `dev.sh summon '{}'`, `qs log` for errors.
+5. `omarchy plugin enable ryenski.taildrop` (adds to `plugins[]` in `~/.config/omarchy/shell.json`), then `dev.sh summon '{}'`, `qs log` for errors.
 6. Never run `omarchy plugin update` while linked (it would git-merge inside the dev repo and then validate the symlink path).
 
 ## Design
@@ -109,7 +109,7 @@ send.sh stage-clipboard [--no-primary]
 
 send.sh pick [--target <dns>]
    omarchy-file-select --title "Send with Taildrop" --multiple
-   picked → omarchy-shell shell summon io.github.ryenski.taildrop '{"files":[…],"source":"chooser","target":…}'  (jq -n --args)
+   picked → omarchy-shell shell summon ryenski.taildrop '{"files":[…],"source":"chooser","target":…}'  (jq -n --args)
    exit 1 (cancel) → re-summon '{}' ; exit 2 → omarchy-notification-send -g 󰒊 -u critical "Could not open file chooser"
 
 send.sh send --target <dns-or-ip> [--label <short>] [--name <sendAs>] <file>...
@@ -135,7 +135,7 @@ Copy the shape of `localsend.py` (`GObject.GObject, Nautilus.MenuProvider`, `_se
 ### Keybind + layer rule (`~/.config/hypr/bindings.lua`, printed by `install.sh`)
 
 ```lua
-o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle io.github.ryenski.taildrop")
+o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle ryenski.taildrop")
 -- optional: the shell's no-fade rule (default/hypr/apps/omarchy-shell.lua:10) is an anchored regex, so add ours
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 ```
