@@ -26,9 +26,9 @@ no pairing.
 Inside the sheet: arrows / Tab move between devices, **Enter** sends,
 **c** switches to the clipboard (ignoring any stale highlight), **i** steps
 through recent images, **f** opens the file chooser, **r** refreshes the
-device list, **Esc** closes. Offline
-devices are shown dimmed and light up when they come online; the list
-refreshes on its own while the sheet is open.
+device list, **Esc** closes. Only devices that can receive right now get a
+tile — the rest are a count — and the list refreshes on its own while the
+sheet is open, so a device shows up as soon as you open Tailscale on it.
 
 Send-only. Receiving is already handled by Omarchy's
 `omarchy-tailscale-receive` service, which drops incoming files into
@@ -90,8 +90,8 @@ send.sh setup [--remove]                 → first-run setup: Nautilus item, key
 ```
 
 Devices come from `tailscale status --json`, using Tailscale's own
-`TaildropTarget` grade: 1 is selectable, 5 is shown offline, anything else
-(another owner, no Taildrop support) is hidden.
+`TaildropTarget` grade: 1 gets a tile, 5 (offline) is counted, anything
+else (another owner, no Taildrop support) is ignored.
 
 ## Develop
 

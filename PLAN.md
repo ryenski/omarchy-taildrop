@@ -25,7 +25,7 @@ Verified on this machine (Tailscale 1.102.3, operator = ryenski, no sudo needed)
 | Deferred | drag-and-drop zone (no DnD onto layer-shell surfaces anywhere in the shell; unverified), multi-target send, inbox/receive UI |
 | Keybind payload | **Highlighted text first, then clipboard.** On `SUPER+SHIFT+T` (payload `{}`), stage the primary selection (`wl-paste --primary`) as `clipboard.txt` if it holds non-empty text; otherwise the clipboard — `image/png` wins over text. The footer says which ("Selection · …" vs "Clipboard · …"); `c` forces the clipboard in case a stale highlight wins. Skip either source when `x-kde-passwordManagerHint` is present (as `plugins/clipboard/capture.sh` does). |
 | Staging | staged at open into `$XDG_RUNTIME_DIR/omarchy-taildrop/clipboard.{png,txt}` so the footer shows exactly what will be sent and the send can't race a clipboard change |
-| Peers | `TaildropTarget == 1` → selectable tile; `== 5` → dimmed "offline" tile; anything else → hidden. Don't depend on the first-party Tailscale widget (third-party `serviceFor` can't reach it anyway, and it's a bar-widget, not a service) |
+| Peers | `TaildropTarget == 1` → tile; `== 5` → not shown, only counted ("N devices offline"; changed from dimmed tiles after use — they were clutter); anything else → hidden. Don't depend on the first-party Tailscale widget (third-party `serviceFor` can't reach it anyway, and it's a bar-widget, not a service) |
 | Keybind | `SUPER + SHIFT + T` — free in `/usr/share/omarchy/default/hypr/bindings/*.lua` and `~/.config/hypr/bindings.lua` (`SUPER+CTRL+T` = btop, `SUPER+CTRL+S` = share menu, `SUPER+SHIFT+S` = user's Google Maps) |
 
 ## Repo layout — `~/Work/omarchy-taildrop`

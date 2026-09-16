@@ -29,8 +29,9 @@ Item {
   property int onlineCount: 0
   property bool refreshing: false
 
-  // Tiles are sorted online-first, so the selectable ones are the first
-  // `onlineCount` entries and the cursor only ever walks that prefix.
+  // Only devices that can receive right now get a tile; the rest are just a
+  // count, so the sheet stays a list of places you can actually send to.
+  property int offlineCount: 0
   property int cursorIndex: 0
   property bool cursorActive: false
 
@@ -246,13 +247,15 @@ Item {
     root.statusMessage = ""
     root.status = "running"
     root.onlineCount = parsed.onlineCount
-    rebuildTiles(parsed.peers)
+    root.offlineCount = parsed.peers.length - parsed.onlineCount
+    rebuildTiles(parsed.peers.filter(function(p) { return p.online }))
   }
 
   function setStatus(state, message) {
     root.status = state
     root.statusMessage = message || ""
     root.onlineCount = 0
+    root.offlineCount = 0
     tileModel.clear()
     root.cursorActive = false
   }
@@ -283,8 +286,7 @@ Item {
         name: p.name,
         target: p.target,
         icon: p.icon,
-        caption: p.online ? Model.osLabel(p.os) : "offline",
-        online: p.online
+        caption: Model.osLabel(p.os)
       })
     }
 
@@ -672,7 +674,6 @@ Item {
               required property string target
               required property string icon
               required property string caption
-              required property bool online
 
               readonly property bool hasCursor: root.cursorActive && index === root.cursorIndex
 
@@ -684,7 +685,6 @@ Item {
                 anchors.margins: Style.spacing.xs
                 hasCursor: tile.hasCursor
                 foreground: root.foreground
-                opacity: tile.online ? 1 : 0.4
 
                 Column {
                   anchors.centerIn: parent
@@ -727,9 +727,8 @@ Item {
 
               MouseArea {
                 anchors.fill: parent
-                hoverEnabled: tile.online
-                enabled: tile.online
-                cursorShape: tile.online ? Qt.PointingHandCursor : Qt.ArrowCursor
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
                 onContainsMouseChanged: if (containsMouse) {
                   root.cursorActive = true
                   root.cursorIndex = tile.index
@@ -874,7 +873,9 @@ Item {
               textFormat: Text.PlainText
               text: {
                 if (root.status === "loading") return "Reading your tailnet…"
-                if (root.status === "running") return "No devices can receive right now"
+                if (root.status === "running") return root.offlineCount > 0
+                  ? (root.offlineCount === 1 ? "Your other device is offline" : "All " + root.offlineCount + " of your other devices are offline")
+                  : "No devices can receive right now"
                 return root.statusMessage
               }
               color: root.foreground
@@ -889,7 +890,7 @@ Item {
             Text {
               textFormat: Text.PlainText
               text: {
-                if (root.status === "running") return "Open Tailscale on the device — this list refreshes on its own."
+                if (root.status === "running") return "Open Tailscale on one and it will show up here."
                 if (root.status === "stopped") return "Start it with `tailscale up`, then press r."
                 if (root.status === "needsLogin") return "Run `tailscale up` in a terminal to sign in."
                 return ""
@@ -905,14 +906,12 @@ Item {
           }
         }
 
-        // Status line for offline-but-listed devices when the grid is up.
+        // Devices that exist but can't receive right now are only a count.
         Text {
           textFormat: Text.PlainText
-          visible: root.phase === "choose" && tileGrid.visible && root.onlineCount < tileModel.count
+          visible: root.phase === "choose" && tileGrid.visible && root.offlineCount > 0
           width: parent.width
-          text: root.onlineCount === 0
-            ? "None of your devices can receive right now — open Tailscale on one and it will light up."
-            : (tileModel.count - root.onlineCount) + " offline"
+          text: root.offlineCount + (root.offlineCount === 1 ? " device offline" : " devices offline")
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
