@@ -12,23 +12,39 @@ no pairing.
 
 ![preview](preview.png)
 
-## What it sends
+## Using it
 
-| How you open it | What's loaded |
+There are two ways to open the sheet, and each arrives with something
+already loaded to send. Pick a device, press **Enter**, done.
+
+**`SUPER + SHIFT + T`** — loads the first of these that exists:
+
+1. text you have highlighted anywhere (the primary selection)
+2. an image on the clipboard — a screenshot you just took counts
+3. text on the clipboard
+
+**Right-click files in Nautilus → Send with Taildrop** — loads those files.
+
+The footer of the sheet always shows what is loaded (with a preview or
+thumbnail), so you can check before sending. To load something else
+without closing the sheet:
+
+| Key | Loads |
 |---|---|
-| `SUPER + SHIFT + T` with text highlighted | the highlighted text, as `clipboard.txt` |
-| `SUPER + SHIFT + T` with an image on the clipboard | the image, as `clipboard.png` (or `.jpg`/`.webp`) |
-| `SUPER + SHIFT + T` otherwise | clipboard text, as `clipboard.txt` |
-| right-click files in Nautilus → **Send with Taildrop** | those files |
-| `i` inside the sheet | the most recent image from Omarchy's clipboard history — screenshots included — even if you've copied text since; press `i` again for older ones |
-| `f` inside the sheet | files from the system chooser |
+| **c** | the clipboard, ignoring any highlighted text |
+| **i** | the most recent image from Omarchy's clipboard history, screenshots included — useful when you copied text since. Press **i** again for older ones. |
+| **f** | files, via the system file chooser |
 
-Inside the sheet: arrows / Tab move between devices, **Enter** sends,
-**c** switches to the clipboard (ignoring any stale highlight), **i** steps
-through recent images, **f** opens the file chooser, **r** refreshes the
-device list, **Esc** closes. Only devices that can receive right now get a
-tile — the rest are a count — and the list refreshes on its own while the
-sheet is open, so a device shows up as soon as you open Tailscale on it.
+Other keys: arrows / Tab move between devices, **r** refreshes the device
+list, **Esc** closes.
+
+Text arrives on the other device as `clipboard.txt`, an image as
+`clipboard.png` (or `.jpg` / `.webp`, matching what was copied); files keep
+their names.
+
+Only devices that can receive right now are shown; the rest are a count.
+The list refreshes while the sheet is open, so a device appears as soon as
+you open Tailscale on it.
 
 Send-only. Receiving is already handled by Omarchy's
 `omarchy-tailscale-receive` service, which drops incoming files into
