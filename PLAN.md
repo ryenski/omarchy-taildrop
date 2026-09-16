@@ -1,5 +1,7 @@
 # Omarchy Taildrop overlay plugin — plan
 
+> **Status (2026-09-16):** all seven steps done; v1 verified end to end on this machine (keybind, highlight/clipboard/image, chooser, Nautilus, progress, retry, install-from-git). Follow-ups are listed at the end.
+
 ## Context
 
 Omarchy already ships Taildrop plumbing: `omarchy-tailscale-send` (file chooser → `tailscale file cp`) reachable from the first-party `omarchy.tailscale` bar panel, and `omarchy-tailscale-receive.service` for the inbox. What's missing is a **share-sheet style UI** like LocalSend's: summon it with a keybind or from a Nautilus right-click, pick a device tile, and send either the clipboard (text → `clipboard.txt`, image → `clipboard.png`) or files. Tailscale provides this on macOS (Share menu) but nothing on Linux.
