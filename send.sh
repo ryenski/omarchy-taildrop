@@ -42,7 +42,8 @@
 #   send.sh setup [--remove]
 #       First-run setup, run by the overlay each time the shell loads it.
 #       Keeps the Nautilus "Send with Taildrop" item in sync with the copy
-#       in this folder, and -- once ever -- appends the SUPER+SHIFT+T keybind
+#       in this folder (restarting Nautilus when it changed, since it only
+#       loads extensions at startup), and -- once ever -- appends the SUPER+SHIFT+T keybind
 #       to ~/.config/hypr/bindings.lua when nothing binds the overlay yet and
 #       the key is free. Idempotent and quiet unless it changes something.
 #       --remove takes the Nautilus item out again (the keybind is yours to
@@ -354,6 +355,13 @@ setup_nautilus() {
   fi
   mkdir -p "$EXT_DIR"
   install -m 0644 "$PLUGIN_DIR/nautilus/taildrop.py" "$EXT_FILE"
+  # nautilus-python loads extensions once at startup, so a running Nautilus
+  # keeps the old module (or none) until it restarts. Only on a real change,
+  # which means install and update.
+  if pgrep -x nautilus >/dev/null; then
+    nautilus -q 2>/dev/null || true
+    NAUTILUS_RESTARTED=1
+  fi
 }
 
 # True when Hyprland already has SUPER+SHIFT+T bound to anything. modmask 65
@@ -394,7 +402,14 @@ setup() {
     fi
     return 0
   fi
-  setup_nautilus && changed+=("Nautilus menu item installed (shows in the next Nautilus window)")
+  NAUTILUS_RESTARTED=0
+  if setup_nautilus; then
+    if (( NAUTILUS_RESTARTED )); then
+      changed+=("Nautilus menu item installed (Nautilus was restarted to load it)")
+    else
+      changed+=("Nautilus menu item installed")
+    fi
+  fi
   setup_keybind && changed+=("$BIND_KEY added to ~/.config/hypr/bindings.lua")
   (( ${#changed[@]} )) || return 0
   printf '%s\n' "${changed[@]}"

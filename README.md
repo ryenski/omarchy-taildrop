@@ -45,8 +45,9 @@ the shell loads the overlay it sets up the two things that live outside the
 plugin folder, and tells you so with a notification:
 
 - the Nautilus **Send with Taildrop** menu item, copied into
-  `~/.local/share/nautilus-python/extensions/` (and kept in sync on updates;
-  it shows up in the next Nautilus window you open);
+  `~/.local/share/nautilus-python/extensions/` and kept in sync on updates.
+  Nautilus only loads extensions at startup, so if it is running when the
+  item is installed or changes, it gets restarted (`nautilus -q`);
 - the keybind, appended **once** to `~/.config/hypr/bindings.lua` — only if
   nothing binds the overlay yet and `SUPER + SHIFT + T` is free. If the key
   is taken you get a notification instead, and you add a line by hand:
