@@ -32,6 +32,15 @@
 #       chooser dialog underneath and unfocusable. Cancelling the chooser
 #       summons the overlay back in clipboard mode.
 #
+#   send.sh setup [--remove]
+#       First-run setup, run by the overlay each time the shell loads it.
+#       Keeps the Nautilus "Send with Taildrop" item in sync with the copy
+#       in this folder, and -- once ever -- appends the SUPER+SHIFT+T keybind
+#       to ~/.config/hypr/bindings.lua when nothing binds the overlay yet and
+#       the key is free. Idempotent and quiet unless it changes something.
+#       --remove takes the Nautilus item out again (the keybind is yours to
+#       delete; it is never touched after the first run).
+#
 # Staging lives under $XDG_RUNTIME_DIR so it is per-user, tmpfs, and gone at
 # logout. The file is named clipboard.<ext> so the receiver sees that name.
 
@@ -43,7 +52,7 @@ PLUGIN_ID=$(jq -r '.id // empty' "$PLUGIN_DIR/manifest.json" 2>/dev/null)
 : "${PLUGIN_ID:=io.github.ryenski.taildrop}"
 
 usage() {
-  sed -n '2,35p' "$0" >&2
+  sed -n '2,44p' "$0" >&2
   exit 2
 }
 
@@ -281,6 +290,67 @@ pick_files() {
   esac
 }
 
+EXT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/nautilus-python/extensions"
+EXT_FILE="$EXT_DIR/taildrop.py"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-taildrop"
+BINDINGS="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/bindings.lua"
+BIND_KEY="SUPER + SHIFT + T"
+BIND_COMMAND="omarchy-shell shell toggle $PLUGIN_ID"
+
+setup_nautilus() {
+  python3 -c 'import gi; gi.require_version("Nautilus", "4.1")' 2>/dev/null || return 1
+  if [[ -f $EXT_FILE ]] && cmp -s "$PLUGIN_DIR/nautilus/taildrop.py" "$EXT_FILE"; then
+    return 1
+  fi
+  mkdir -p "$EXT_DIR"
+  install -m 0644 "$PLUGIN_DIR/nautilus/taildrop.py" "$EXT_FILE"
+}
+
+# True when Hyprland already has SUPER+SHIFT+T bound to anything. modmask 65
+# is SUPER (64) + SHIFT (1).
+bind_key_taken() {
+  hyprctl binds -j 2>/dev/null | jq -e '.[] | select(.modmask == 65 and (.key | ascii_downcase) == "t")' >/dev/null 2>&1
+}
+
+setup_keybind() {
+  local marker="$STATE_DIR/keybind-offered"
+  [[ -f $marker ]] && return 1
+  [[ -f $BINDINGS ]] || return 1
+  mkdir -p "$STATE_DIR"
+  if grep -qF "$BIND_COMMAND" "$BINDINGS"; then
+    touch "$marker"
+    return 1
+  fi
+  if bind_key_taken; then
+    touch "$marker"
+    notify "Taildrop has no shortcut yet" "$BIND_KEY is already in use. Add a bind for: $BIND_COMMAND"
+    return 1
+  fi
+  cat >>"$BINDINGS" <<LUA
+
+-- Taildrop share sheet ($PLUGIN_ID plugin).
+o.bind("$BIND_KEY", "Send via Taildrop", "$BIND_COMMAND")
+hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
+LUA
+  touch "$marker"
+}
+
+setup() {
+  local changed=()
+  if [[ ${1:-} == --remove ]]; then
+    if [[ -f $EXT_FILE ]]; then
+      rm -f "$EXT_FILE"
+      echo "Removed $EXT_FILE"
+    fi
+    return 0
+  fi
+  setup_nautilus && changed+=("Nautilus menu item installed (shows in the next Nautilus window)")
+  setup_keybind && changed+=("$BIND_KEY added to ~/.config/hypr/bindings.lua")
+  (( ${#changed[@]} )) || return 0
+  printf '%s\n' "${changed[@]}"
+  notify "Taildrop is set up" "$(printf '%s. ' "${changed[@]}")"
+}
+
 case "${1:-}" in
   stage-clipboard)
     shift
@@ -293,6 +363,10 @@ case "${1:-}" in
   pick)
     shift
     pick_files "$@"
+    ;;
+  setup)
+    shift
+    setup "$@"
     ;;
   *)
     usage

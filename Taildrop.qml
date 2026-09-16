@@ -427,6 +427,22 @@ Item {
   ListModel { id: tileModel }
   ListModel { id: transferModel }
 
+  // First-run setup (Nautilus item, keybind) runs whenever the shell loads
+  // this plugin, i.e. on enable and at each login. It is idempotent and
+  // silent unless it changes something.
+  Component.onCompleted: setupProcess.running = true
+
+  Process {
+    id: setupProcess
+    command: [root.sendSh, "setup"]
+    stdout: StdioCollector { id: setupStdout; waitForEnd: true }
+    onExited: function(exitCode) {
+      var out = String(setupStdout.text || "").trim()
+      if (out !== "") console.log("taildrop setup: " + out.replace(/\n/g, "; "))
+      if (exitCode !== 0) console.warn("taildrop setup exited " + exitCode)
+    }
+  }
+
   Process {
     id: sendProcess
     stdout: SplitParser { onRead: function(data) { root.handleSendLine(data) } }

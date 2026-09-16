@@ -36,18 +36,26 @@ Send-only. Receiving is already handled by Omarchy's
 
 ```bash
 omarchy plugin add https://github.com/ryenski/omarchy-taildrop.git --enable
-~/.config/omarchy/plugins/io.github.ryenski.taildrop/install.sh
 ```
 
-`omarchy plugin add` installs and enables the overlay; it never runs plugin
-code, so the two extras are a separate step. `install.sh` copies the Nautilus
-menu item into `~/.local/share/nautilus-python/extensions/` and prints the
-keybind lines to add to `~/.config/hypr/bindings.lua`:
+That's it. `omarchy plugin add` never runs plugin code, but the first time
+the shell loads the overlay it sets up the two things that live outside the
+plugin folder, and tells you so with a notification:
+
+- the Nautilus **Send with Taildrop** menu item, copied into
+  `~/.local/share/nautilus-python/extensions/` (and kept in sync on updates;
+  it shows up in the next Nautilus window you open);
+- the keybind, appended **once** to `~/.config/hypr/bindings.lua` — only if
+  nothing binds the overlay yet and `SUPER + SHIFT + T` is free. If the key
+  is taken you get a notification instead, and you add a line by hand:
 
 ```lua
 o.bind("SUPER + SHIFT + T", "Send via Taildrop", "omarchy-shell shell toggle io.github.ryenski.taildrop")
 hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, animation = "none" })
 ```
+
+The keybind is never touched again after that first run, so changing or
+deleting it later sticks. `install.sh` runs the same setup by hand.
 
 Requirements: `tailscale` on `PATH` with the operator set to your user
 (`sudo tailscale set --operator=$USER`), Taildrop enabled for the tailnet,
@@ -63,7 +71,8 @@ omarchy plugin remove io.github.ryenski.taildrop
 
 and delete the two lines from `bindings.lua`. If you only run
 `omarchy plugin remove`, the Nautilus item notices the plugin is gone and
-stops showing up; `install.sh --remove` just deletes the leftover file.
+stops showing up; `install.sh --remove` just deletes the leftover file
+(run it first, while the plugin folder still exists).
 
 ## How it works
 
@@ -74,6 +83,7 @@ stops showing up; `install.sh --remove` just deletes the leftover file.
 send.sh stage-clipboard [--no-primary]   → JSON describing what was staged
 send.sh send --target <dns> <file>...    → tab-separated progress lines, a notification
 send.sh pick [--target <dns>]            → file chooser, then re-summons the overlay
+send.sh setup [--remove]                 → first-run setup: Nautilus item, keybind
 ```
 
 Devices come from `tailscale status --json`, using Tailscale's own
