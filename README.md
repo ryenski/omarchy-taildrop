@@ -130,6 +130,7 @@ omarchy plugin enable ryenski.taildrop
 ./dev.sh summon      # or with a payload: ./dev.sh summon '{"files":["/etc/hostname"]}'
 ./dev.sh reload      # after editing QML: restarts the shell (~1s)
 ./dev.sh validate && ./dev.sh lint
+./dev.sh test        # Model.js (node --test) and the Nautilus extension (unittest); no Nautilus needed
 ```
 
 The shell caches compiled QML for the life of its process, so edits only

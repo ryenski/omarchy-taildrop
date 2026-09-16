@@ -8,6 +8,7 @@
 #   dev.sh watch      reload whenever a file in this repo changes
 #   dev.sh validate   omarchy plugin validate (against the real repo path)
 #   dev.sh lint       qmllint every .qml file against the shell's import path
+#   dev.sh test       unit tests for Model.js (node --test) and the Nautilus extension (unittest)
 #   dev.sh summon [json]   open the overlay with an optional payload
 #   dev.sh hide       close the overlay
 #
@@ -82,6 +83,10 @@ case "${1:-}" in
     fi
     echo "lint ok ($(grep -c '^Warning' <<<"$output" || true) known-noise warnings suppressed)"
     ;;
+  test)
+    node --test "$repo"/test/*.test.js
+    python3 -m unittest discover -s "$repo/test"
+    ;;
   summon)
     omarchy-shell shell summon "$id" "${2:-{\}}"
     ;;
@@ -89,7 +94,7 @@ case "${1:-}" in
     omarchy-shell shell hide "$id"
     ;;
   *)
-    sed -n '2,16p' "$0"
+    sed -n '2,17p' "$0"
     exit 1
     ;;
 esac
