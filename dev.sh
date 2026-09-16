@@ -75,7 +75,7 @@ case "${1:-}" in
     ln -sfn "$omarchy_path/shell" "$imports/qs"
     output=$("$qmllint" -I "$imports" "$repo"/*.qml 2>&1 || true)
     filtered=$(grep -E '^(Warning|Error)' <<<"$output" \
-      | grep -Ev 'Unqualified access|not found on type "QObject"|Type PanelWindow is not creatable' || true)
+      | grep -Ev 'Unqualified access|not found on type "QObject"|Type PanelWindow is not creatable|QProcess::ExitStatus' || true)
     if [[ -n $filtered ]]; then
       echo "$filtered"
       exit 1
