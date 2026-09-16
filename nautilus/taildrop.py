@@ -6,6 +6,7 @@
 # ~/.local/share/nautilus-python/extensions/.
 
 import json
+import os
 import shutil
 
 from gi import require_version
@@ -15,12 +16,21 @@ require_version("Nautilus", "4.1")
 from gi.repository import GObject, Gio, Nautilus
 
 PLUGIN_ID = "io.github.ryenski.taildrop"
+PLUGIN_MANIFEST = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+    "omarchy", "plugins", PLUGIN_ID, "manifest.json",
+)
 
 
 class SendWithTaildropAction(GObject.GObject, Nautilus.MenuProvider):
     def _resolve_command(self):
-        # Both come from the Omarchy session environment; a Nautilus started
-        # outside it (or a machine without Tailscale) simply gets no item.
+        # This file outlives `omarchy plugin remove`, so check on every menu
+        # that the plugin is still installed rather than offering an item
+        # that summons nothing. omarchy-shell and tailscale come from the
+        # Omarchy session environment; a Nautilus started outside it (or a
+        # machine without Tailscale) simply gets no item either.
+        if not os.path.isfile(PLUGIN_MANIFEST):
+            return None
         omarchy_shell = shutil.which("omarchy-shell")
         if not omarchy_shell or not shutil.which("tailscale"):
             return None

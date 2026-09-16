@@ -61,7 +61,9 @@ Progress percentages need util-linux `script` (present on Omarchy).
 omarchy plugin remove io.github.ryenski.taildrop
 ```
 
-and delete the two lines from `bindings.lua`.
+and delete the two lines from `bindings.lua`. If you only run
+`omarchy plugin remove`, the Nautilus item notices the plugin is gone and
+stops showing up; `install.sh --remove` just deletes the leftover file.
 
 ## How it works
 
