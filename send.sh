@@ -24,6 +24,13 @@
 #       and posting one notification at the end. Exit 0 when everything was
 #       sent, 1 when any file failed, 2 on bad arguments.
 #
+#   send.sh stage-image [--back N]
+#       Stage an image from Omarchy's clipboard history: the newest one, or
+#       the Nth before it. Screenshots land there too, so this is "the last
+#       image I copied or captured" even after copying text since. Same JSON
+#       as stage-clipboard plus index/total/capturedAt; {"kind":"none"} when
+#       the history has no images.
+#
 #   send.sh pick [--target <dns-or-host>]
 #       Run the system file chooser, then summon the overlay again with the
 #       chosen files (and the target, so the same tile stays under the
@@ -52,7 +59,7 @@ PLUGIN_ID=$(jq -r '.id // empty' "$PLUGIN_DIR/manifest.json" 2>/dev/null)
 : "${PLUGIN_ID:=ryenski.taildrop}"
 
 usage() {
-  sed -n '2,44p' "$0" >&2
+  sed -n '2,51p' "$0" >&2
   exit 2
 }
 
@@ -111,6 +118,49 @@ stage_image() {
   fi
   jq -cn --arg path "$file" --arg mime "$mime" --argjson bytes "$(stat -c %s "$file")" \
     '{kind:"image", source:"clipboard", path:$path, mime:$mime, bytes:$bytes}'
+}
+
+HISTORY_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/clipboard-history.json"
+
+stage_image() {
+  local back=0 total=0 index=0 line path mime captured ext file
+  local -a entries=()
+
+  while (( $# )); do
+    case "$1" in
+      --back) back="${2:-0}"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ $back =~ ^[0-9]+$ ]] || usage
+
+  # Newest first, one entry per line; skip images whose file has since been
+  # pruned from the cache.
+  if [[ -f $HISTORY_FILE ]]; then
+    while IFS=$'\t' read -r path mime captured; do
+      [[ -f $path ]] && entries+=("$path"$'\t'"$mime"$'\t'"$captured")
+    done < <(jq -r '.[] | select(.type == "image" and (.path // "") != "")
+                        | [.path, (.mime // "image/png"), (.capturedAt // "")] | @tsv' "$HISTORY_FILE" 2>/dev/null)
+  fi
+  total=${#entries[@]}
+  if (( total == 0 )); then
+    echo '{"kind":"none"}'
+    return 0
+  fi
+
+  # Stepping past the oldest wraps around to the newest.
+  index=$(( back % total ))
+  IFS=$'\t' read -r path mime captured <<<"${entries[$index]}"
+
+  ext=${mime#image/}
+  [[ $ext == jpeg ]] && ext=jpg
+  reset_stage
+  file="$STAGE_DIR/clipboard.$ext"
+  cp -- "$path" "$file" || { echo '{"kind":"none"}'; return 0; }
+
+  jq -cn --arg path "$file" --arg mime "$mime" --arg captured "$captured" \
+    --argjson bytes "$(stat -c %s "$file")" --argjson index "$index" --argjson total "$total" \
+    '{kind:"image", source:"history", path:$path, mime:$mime, bytes:$bytes, index:$index, total:$total, capturedAt:$captured}'
 }
 
 stage_clipboard() {
@@ -359,6 +409,10 @@ case "${1:-}" in
   send)
     shift
     send_files "$@"
+    ;;
+  stage-image)
+    shift
+    stage_image "$@"
     ;;
   pick)
     shift

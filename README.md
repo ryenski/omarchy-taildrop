@@ -20,11 +20,13 @@ no pairing.
 | `SUPER + SHIFT + T` with an image on the clipboard | the image, as `clipboard.png` (or `.jpg`/`.webp`) |
 | `SUPER + SHIFT + T` otherwise | clipboard text, as `clipboard.txt` |
 | right-click files in Nautilus → **Send with Taildrop** | those files |
+| `i` inside the sheet | the most recent image from Omarchy's clipboard history — screenshots included — even if you've copied text since; press `i` again for older ones |
 | `f` inside the sheet | files from the system chooser |
 
 Inside the sheet: arrows / Tab move between devices, **Enter** sends,
-**c** switches to the clipboard (ignoring any stale highlight), **f** opens
-the file chooser, **r** refreshes the device list, **Esc** closes. Offline
+**c** switches to the clipboard (ignoring any stale highlight), **i** steps
+through recent images, **f** opens the file chooser, **r** refreshes the
+device list, **Esc** closes. Offline
 devices are shown dimmed and light up when they come online; the list
 refreshes on its own while the sheet is open.
 
@@ -81,6 +83,7 @@ stops showing up; `install.sh --remove` just deletes the leftover file
 
 ```
 send.sh stage-clipboard [--no-primary]   → JSON describing what was staged
+send.sh stage-image [--back N]           → an image from the clipboard history, newest first
 send.sh send --target <dns> <file>...    → tab-separated progress lines, a notification
 send.sh pick [--target <dns>]            → file chooser, then re-summons the overlay
 send.sh setup [--remove]                 → first-run setup: Nautilus item, keybind

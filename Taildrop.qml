@@ -41,6 +41,9 @@ Item {
   property string payloadPreview: ""
   property int payloadBytes: 0
   property string payloadMime: ""
+  property int payloadIndex: 0          // history images: which one, and how many
+  property int payloadTotal: 0
+  property string payloadCaptured: ""
   property var payloadFiles: []
   property int payloadStamp: 0          // bumps so the thumbnail reloads a same-named file
   readonly property bool payloadReady: payloadKind === "text" || payloadKind === "image" || payloadKind === "files"
@@ -139,12 +142,21 @@ Item {
   }
 
   function stageClipboard(clipboardOnly) {
+    runStage(clipboardOnly ? [root.sendSh, "stage-clipboard", "--no-primary"] : [root.sendSh, "stage-clipboard"])
+  }
+
+  // `i` stages the newest image from the clipboard history; pressing it
+  // again steps back through older ones (wrapping at the oldest).
+  function stageHistoryImage() {
+    var back = root.payloadKind === "image" && root.payloadSource === "history" ? root.payloadIndex + 1 : 0
+    runStage([root.sendSh, "stage-image", "--back", String(back)])
+  }
+
+  function runStage(command) {
     if (stageProcess.running) return
     root.payloadKind = "staging"
     root.payloadFiles = []
-    stageProcess.command = clipboardOnly
-      ? [root.sendSh, "stage-clipboard", "--no-primary"]
-      : [root.sendSh, "stage-clipboard"]
+    stageProcess.command = command
     stageProcess.running = true
   }
 
@@ -162,6 +174,9 @@ Item {
     root.payloadPath = String(info.path || "")
     root.payloadBytes = Number(info.bytes || 0)
     root.payloadMime = String(info.mime || "")
+    root.payloadIndex = Number(info.index || 0)
+    root.payloadTotal = Number(info.total || 0)
+    root.payloadCaptured = String(info.capturedAt || "")
     root.payloadPreview = String(info.preview || "")
     root.payloadStamp = root.payloadStamp + 1
     root.payloadKind = kind
@@ -170,16 +185,26 @@ Item {
   // Human label for the footer chip.
   readonly property string payloadLabel: {
     if (payloadKind === "files") return payloadFiles.length === 1 ? "1 file" : payloadFiles.length + " files"
-    if (payloadKind === "image") return "Image"
+    if (payloadKind === "image") return payloadSource === "history" ? "Recent image" : "Clipboard image"
     if (payloadKind === "text") return payloadSource === "selection" ? "Selection" : "Clipboard"
     if (payloadKind === "staging") return "Reading clipboard…"
     if (payloadKind === "sensitive") return "Clipboard is private"
     return "Nothing to send"
   }
   readonly property string payloadDetail: {
-    if (payloadKind === "image") return payloadMime.replace("image/", "").toUpperCase() + " from the clipboard · " + formatBytes(payloadBytes)
+    if (payloadKind === "image") {
+      var bits = []
+      if (payloadSource === "history") {
+        if (payloadCaptured !== "") bits.push(payloadCaptured)
+        if (payloadTotal > 1) bits.push((payloadIndex + 1) + " of " + payloadTotal)
+      } else {
+        bits.push("on the clipboard now")
+      }
+      bits.push(payloadMime.replace("image/", "").toUpperCase() + " · " + formatBytes(payloadBytes))
+      return bits.join(" · ")
+    }
     if (payloadKind === "sensitive") return "Your password manager marked it — copy something else"
-    if (payloadKind === "none") return "Highlight or copy text, or press f to pick files"
+    if (payloadKind === "none") return "Highlight or copy something, i for a recent image, f for files"
     return payloadPreview
   }
   readonly property string payloadGlyph: {
@@ -563,6 +588,8 @@ Item {
             root.stageClipboard(true)
           } else if (text === "f") {
             root.pickFiles()
+          } else if (text === "i") {
+            root.stageHistoryImage()
           } else {
             return
           }
@@ -966,7 +993,7 @@ Item {
                 if (root.phase === "sending") return [["esc", "close (keeps sending)"]]
                 if (root.phase === "failed") return [["r", "retry"], ["esc", "close"]]
                 if (root.phase === "done") return [["esc", "close"]]
-                return [["↵", "send"], ["c", "clipboard"], ["f", "files"], ["r", "refresh"], ["esc", "close"]]
+                return [["↵", "send"], ["c", "clipboard"], ["i", "image"], ["f", "files"], ["r", "refresh"], ["esc", "close"]]
               }
 
               Row {
