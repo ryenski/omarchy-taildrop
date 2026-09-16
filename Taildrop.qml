@@ -35,6 +35,18 @@ Item {
   property bool cursorActive: false
   property string lastChoice: ""
 
+  // What will be sent. kind: staging | text | image | files | none | sensitive
+  property string payloadKind: "staging"
+  property string payloadSource: ""     // selection | clipboard | nautilus | chooser
+  property string payloadPath: ""       // staged clipboard file
+  property string payloadPreview: ""
+  property int payloadBytes: 0
+  property string payloadMime: ""
+  property var payloadFiles: []
+  property int payloadStamp: 0          // bumps so the thumbnail reloads a same-named file
+  readonly property bool payloadReady: payloadKind === "text" || payloadKind === "image" || payloadKind === "files"
+  readonly property string sendSh: localPath(Qt.resolvedUrl("send.sh"))
+
   // Shares the [menu] surface tokens so themes that style the menu style us.
   property color background: Color.menu.background
   property color foreground: Color.menu.text
@@ -84,6 +96,9 @@ Item {
     // Force a rebuild so a `target` in the payload can move the cursor.
     root.tileSignature = ""
     root.refresh()
+    var files = Array.isArray(root.payload.files) ? root.payload.files.filter(function(f) { return typeof f === "string" && f !== "" }) : []
+    if (files.length > 0) setFilesPayload(files, String(root.payload.source || "files"))
+    else stageClipboard(false)
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -100,6 +115,73 @@ Item {
   function toggle() {
     if (root.opened) root.dismiss()
     else root.open("{}")
+  }
+
+  function setFilesPayload(files, source) {
+    root.payloadFiles = files
+    root.payloadSource = source
+    root.payloadPath = ""
+    root.payloadBytes = 0
+    root.payloadPreview = files.map(function(f) { return String(f).split("/").pop() }).join(", ")
+    root.payloadKind = "files"
+  }
+
+  function stageClipboard(clipboardOnly) {
+    if (stageProcess.running) return
+    root.payloadKind = "staging"
+    root.payloadFiles = []
+    stageProcess.command = clipboardOnly
+      ? [root.sendSh, "stage-clipboard", "--no-primary"]
+      : [root.sendSh, "stage-clipboard"]
+    stageProcess.running = true
+  }
+
+  function applyStaged(exitCode, stdout) {
+    var info = {}
+    try { info = JSON.parse(String(stdout || "").trim() || "{}") } catch (e) { info = {} }
+    var kind = String(info.kind || "")
+    if (exitCode !== 0 || kind === "") {
+      root.payloadKind = "none"
+      root.payloadPreview = ""
+      console.warn("taildrop: stage-clipboard failed (exit " + exitCode + "): " + stdout)
+      return
+    }
+    root.payloadSource = String(info.source || "")
+    root.payloadPath = String(info.path || "")
+    root.payloadBytes = Number(info.bytes || 0)
+    root.payloadMime = String(info.mime || "")
+    root.payloadPreview = String(info.preview || "")
+    root.payloadStamp = root.payloadStamp + 1
+    root.payloadKind = kind
+  }
+
+  // Human label for the footer chip.
+  readonly property string payloadLabel: {
+    if (payloadKind === "files") return payloadFiles.length === 1 ? "1 file" : payloadFiles.length + " files"
+    if (payloadKind === "image") return "Image"
+    if (payloadKind === "text") return payloadSource === "selection" ? "Selection" : "Clipboard"
+    if (payloadKind === "staging") return "Reading clipboard…"
+    if (payloadKind === "sensitive") return "Clipboard is private"
+    return "Nothing to send"
+  }
+  readonly property string payloadDetail: {
+    if (payloadKind === "image") return payloadMime.replace("image/", "").toUpperCase() + " from the clipboard · " + formatBytes(payloadBytes)
+    if (payloadKind === "sensitive") return "Your password manager marked it — copy something else"
+    if (payloadKind === "none") return "Highlight or copy text, or press f to pick files"
+    return payloadPreview
+  }
+  readonly property string payloadGlyph: {
+    if (payloadKind === "files") return "󰈔"
+    if (payloadKind === "image") return "󰋩"
+    if (payloadKind === "text") return payloadSource === "selection" ? "󰗧" : "󰅇"
+    if (payloadKind === "sensitive") return "󰌾"
+    return "󰅇"
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return n + " B"
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB"
+    return (n / (1024 * 1024)).toFixed(1) + " MB"
   }
 
   function refresh() {
@@ -199,6 +281,7 @@ Item {
 
   function activateTile(index) {
     if (index < 0 || index >= root.onlineCount) return
+    if (!root.payloadReady) return
     var tile = tileModel.get(index)
     // Sending lands in a later step; for now record the choice.
     root.lastChoice = tile.name
@@ -215,6 +298,14 @@ Item {
     stderr: StdioCollector { id: statusStderr; waitForEnd: true }
     onExited: function(exitCode) {
       root.applyStatus(exitCode, statusStdout.text, statusStderr.text)
+    }
+  }
+
+  Process {
+    id: stageProcess
+    stdout: StdioCollector { id: stageStdout; waitForEnd: true }
+    onExited: function(exitCode) {
+      root.applyStaged(exitCode, stageStdout.text)
     }
   }
 
@@ -282,6 +373,8 @@ Item {
             if (root.cursorActive) root.activateTile(root.cursorIndex)
           } else if (text === "r") {
             root.refresh()
+          } else if (text === "c") {
+            root.stageClipboard(true)
           } else {
             return
           }
@@ -501,31 +594,77 @@ Item {
           wrapMode: Text.WordWrap
         }
 
-        // Footer: payload summary lands in the next step; for now the hints.
+        // Footer: what will be sent, and the key hints.
         Item {
           width: parent.width
-          height: footerRow.implicitHeight
+          height: Math.max(payloadChip.implicitHeight, footerRow.implicitHeight)
 
-          Text {
-            textFormat: Text.PlainText
+          Row {
+            id: payloadChip
             anchors.left: parent.left
             anchors.right: footerRow.left
-            anchors.rightMargin: Style.spacing.lg
+            anchors.rightMargin: Style.spacing.xl
             anchors.verticalCenter: parent.verticalCenter
-            text: root.lastChoice ? "Chose " + root.lastChoice + " (sending lands in step 4)" : "payload: " + JSON.stringify(root.payload)
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            elide: Text.ElideRight
+            spacing: Style.spacing.lg
+
+            Image {
+              id: thumbnail
+              visible: root.payloadKind === "image" && root.payloadPath !== ""
+              source: visible ? Util.fileUrl(root.payloadPath) + "?" + root.payloadStamp : ""
+              cache: false
+              asynchronous: true
+              fillMode: Image.PreserveAspectFit
+              height: Style.space(40)
+              width: visible ? Math.max(Style.space(24), Math.min(Style.space(96), implicitWidth * (height / Math.max(1, implicitHeight)))) : 0
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: !thumbnail.visible
+              text: root.payloadGlyph
+              color: root.payloadReady ? root.foreground : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.iconLarge
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Column {
+              width: payloadChip.width - payloadChip.spacing - (thumbnail.visible ? thumbnail.width : Style.font.iconLarge)
+              spacing: Style.spacing.xxs
+              anchors.verticalCenter: parent.verticalCenter
+
+              Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: root.lastChoice ? root.payloadLabel + " → " + root.lastChoice + " (sending lands in step 4)" : root.payloadLabel
+                color: root.payloadReady ? root.foreground : root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                elide: Text.ElideRight
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                visible: text !== ""
+                text: root.payloadDetail
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
+              }
+            }
           }
 
           Row {
             id: footerRow
             anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
             spacing: Style.spacing.xl
 
             Repeater {
-              model: [["↵", "send"], ["r", "refresh"], ["esc", "close"]]
+              model: [["↵", "send"], ["c", "clipboard"], ["r", "refresh"], ["esc", "close"]]
 
               Row {
                 required property var modelData
