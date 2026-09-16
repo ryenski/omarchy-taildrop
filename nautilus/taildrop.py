@@ -2,7 +2,7 @@
 #
 # Hands the selected files to the Omarchy Taildrop overlay, which opens with
 # them loaded so the user only has to pick a device. Modelled on Omarchy's
-# own localsend.py extension. Installed by install.sh into
+# own localsend.py extension. Installed by `send.sh setup` into
 # ~/.local/share/nautilus-python/extensions/.
 
 import json
