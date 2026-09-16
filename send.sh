@@ -12,6 +12,18 @@
 #       Order: highlighted text (primary selection), then a clipboard image,
 #       then clipboard text. --no-primary skips the highlight.
 #
+#   send.sh send --target <dns-or-host> [--label <short name>] <file>...
+#       Send each file in turn with `tailscale file cp`, reporting on stdout
+#       as tab-separated lines:
+#         begin  <count>  <label>
+#         file   <i>  <basename>  <bytes>
+#         progress  <i>  <pct>  <sent>            e.g. 42.6  2.03MiB
+#         done   <i>
+#         fail   <i>  <message>
+#         end    <ok-count>  <failed-count>
+#       and posting one notification at the end. Exit 0 when everything was
+#       sent, 1 when any file failed, 2 on bad arguments.
+#
 # Staging lives under $XDG_RUNTIME_DIR so it is per-user, tmpfs, and gone at
 # logout. The file is named clipboard.<ext> so the receiver sees that name.
 
@@ -20,7 +32,7 @@ set -o pipefail
 STAGE_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-taildrop"
 
 usage() {
-  sed -n '2,15p' "$0" >&2
+  sed -n '2,27p' "$0" >&2
   exit 2
 }
 
@@ -111,10 +123,126 @@ stage_clipboard() {
   echo '{"kind":"none"}'
 }
 
+emit() {
+  local IFS=$'\t'
+  printf '%s\n' "$*"
+}
+
+notify() {
+  # Best effort: the transfer outcome is already reported on stdout.
+  omarchy-notification-send -g "󰒊" "$@" >/dev/null 2>&1 || true
+}
+
+# Runs `tailscale file cp` for one file. Tailscale only draws its progress
+# meter on a terminal, so give it a pty through util-linux `script` and turn
+# the carriage-return-separated redraws into progress lines. Without `script`
+# the transfer still happens, just without percentages.
+send_one() {
+  local index="$1" file="$2" target="$3"
+  local -a cmd=(tailscale file cp --update-interval=250ms -- "$file" "$target:")
+  local chunk line last_pct="" message="" status
+
+  if command -v script >/dev/null; then
+    local quoted
+    quoted=$(printf '%q ' "${cmd[@]}")
+    while IFS= read -r -d $'\r' chunk || [[ -n $chunk ]]; do
+      # The subshell's exit code rides on its last line.
+      if [[ $chunk == *__exit=* ]]; then
+        status=${chunk##*__exit=}
+        status=${status%%[^0-9]*}
+        chunk=${chunk%__exit=*}
+      fi
+      # Strip cursor-control sequences and stray newlines from the redraw.
+      chunk=$(sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' <<<"${chunk//$'\n'/ }")
+      [[ -n ${chunk// /} ]] || continue
+      if [[ $chunk =~ [[:space:]]([0-9.]+[KMGT]?i?B)[[:space:]]+[0-9.]+[KMGT]?i?B/s[[:space:]]+([0-9]+(\.[0-9]+)?)%[[:space:]]+ETA ]]; then
+        [[ ${BASH_REMATCH[2]} == "$last_pct" ]] && continue
+        last_pct=${BASH_REMATCH[2]}
+        emit progress "$index" "$last_pct" "${BASH_REMATCH[1]}"
+      else
+        message=$chunk
+      fi
+    done < <(script -qefc "$quoted" /dev/null 2>&1; echo "__exit=$?")
+    [[ $status =~ ^[0-9]+$ ]] || status=1
+  else
+    message=$("${cmd[@]}" 2>&1)
+    status=$?
+  fi
+
+  message=$(sed -E 's/^[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9:]+ //' <<<"$message" | tr -s '[:space:]' ' ')
+  message=${message## }
+  message=${message%% }
+
+  if (( status == 0 )); then
+    emit done "$index"
+    return 0
+  fi
+  emit fail "$index" "${message:-Transfer failed}"
+  return 1
+}
+
+send_files() {
+  local target="" label="" file index=0 ok=0 failed=0 what last_error=""
+  local -a files=()
+
+  while (( $# )); do
+    case "$1" in
+      --target) target="${2:-}"; shift 2 ;;
+      --label) label="${2:-}"; shift 2 ;;
+      --) shift; files+=("$@"); break ;;
+      -*) usage ;;
+      *) files+=("$1"); shift ;;
+    esac
+  done
+
+  [[ -n $target && ${#files[@]} -gt 0 ]] || usage
+  [[ -n $label ]] || label=${target%%.*}
+
+  for file in "${files[@]}"; do
+    if [[ ! -f $file || ! -r $file ]]; then
+      echo "send.sh: not a readable file: $file" >&2
+      exit 2
+    fi
+  done
+
+  emit begin "${#files[@]}" "$label"
+  for file in "${files[@]}"; do
+    emit file "$index" "${file##*/}" "$(stat -c %s -- "$file")"
+    if send_one "$index" "$file" "$target"; then
+      ((ok++))
+    else
+      ((failed++))
+    fi
+    ((index++))
+  done
+  emit end "$ok" "$failed"
+
+  if (( ${#files[@]} == 1 )); then
+    what=${files[0]##*/}
+  else
+    what="${#files[@]} files"
+  fi
+
+  if (( failed == 0 )); then
+    notify "Sent to $label" "$what"
+    return 0
+  fi
+  if (( ok == 0 )); then
+    notify -u critical "Could not send to $label" "$what"
+  else
+    notify -u critical "Sent $ok of ${#files[@]} files to $label" "$failed failed"
+  fi
+  return 1
+}
+
 case "${1:-}" in
   stage-clipboard)
     shift
     stage_clipboard "$@"
+    ;;
+  send)
+    shift
+    send_files "$@"
     ;;
   *)
     usage

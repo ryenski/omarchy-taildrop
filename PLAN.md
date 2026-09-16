@@ -161,7 +161,8 @@ hl.layer_rule({ match = { namespace = "omarchy-taildrop" }, no_anim = true, anim
 
 ## Risks / open questions
 
-- Progress output: the format `  %s: %s / %s (%.1f%%)\n` is in the `tailscale` binary, but stdout-vs-stderr and unit strings are unverified until step 4 (merge `2>&1`; parser tolerant).
+- ~~Progress output format~~ Resolved in step 4: `tailscale file cp` draws its meter **only on a TTY**, as `\r`-separated redraws (`name  sent  rate  pct%  ETA`); nothing on stdout/stderr otherwise, and `--verbose` gives only "sending…/sent" lines. `send.sh` runs it under util-linux `script -qefc` to get percentages and parses the chunks (falls back to no percentages if `script` is missing).
+- `Process.exited` can fire before `SplitParser` delivers the last stdout lines; the overlay settles the outcome from the row states after a short grace period rather than trusting the `end` line (bug found in step 4).
 - Only code-1 peers are selectable, which sidesteps `file cp` blocking on an offline peer.
 - Primary selection is sticky on Wayland: a highlight from minutes ago can outrank a fresh Ctrl+C. The footer preview makes this visible and `c` overrides; if it proves annoying in practice, flip the default order (clipboard first) — one-line change in `send.sh`.
 - Non-PNG clipboard images keep their extension (`clipboard.jpg`); PNG preferred when offered.
